@@ -24,39 +24,58 @@ public:
     }
     void print() const
     {
-        printf("element[%d], data[%s]\n", m_index, m_data);
+        printf("index[%d], data[%s]\n", m_index, m_data);
     }
-    bool isIndexOdd() const
+    inline int getIndex() const
     {
-        return (m_index & 0x1);
+        return m_index;
     }
 private:
     int  m_index;
     char m_data[28];
 };
 
+mj::ThreadSafeList<element> elist;
+
+void* threadFunc(void* arg)
+{
+    int thid = *((int*)arg);
+    printf("==>thread[%d] begin\n", thid);
+    auto pElement = elist.find_first_if([thid](const element& em){ return em.getIndex() == thid; });
+    if (pElement) {
+        printf("==>thread[%d] get element: ", thid);
+        pElement->print();
+    } else {
+        printf("==>thread[%d] can't find element\n", thid);
+    }
+
+    printf("==>thread[%d] after remove element:\n", thid);
+    elist.remove_if([thid](const element& em){ return em.getIndex() == thid; });
+    elist.for_each([](const element& em){ em.print(); });
+    printf("==>thread[%d] exit\n\n", thid);
+    return NULL;
+}
+
 int main(int argc, const char *argv[])
 {
     printf("test begin....\n");
-    mj::ThreadSafeList<element> elist;
-    int i = 0;
-    elist.push_front(element(i++, "zmj"));
-    elist.push_front(element(i++, "zoe"));
-    printf("==>original list elements:\n");
-    elist.for_each([](const element& em){ em.print(); });
-    
-    auto pElement = elist.find_first_if([](const element& em){ return em.isIndexOdd(); });
-    if (pElement) {
-        printf("==>first element with odd index:\n");
-        pElement->print();
-    } else {
-        printf("can't find element with odd index\n");
+    const int THREAD_NUM = 16;
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        elist.push_front(element(i, "zmj"));
     }
-
-    printf("==>after remove all element with odd index:\n");
-    elist.remove_if([](const element& em){ return em.isIndexOdd(); });
+    printf("original list elements:\n");
     elist.for_each([](const element& em){ em.print(); });
+    printf("\n");
 
-    printf("done\n");
+    pthread_t thid[THREAD_NUM];
+    int localThid[THREAD_NUM];
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        localThid[i] = i;
+        pthread_create(&thid[i], NULL, threadFunc, (void*)&localThid[i]);
+    }
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        pthread_join(thid[i], NULL);
+    }
+    printf("test done\n");
     return 0;
 }
