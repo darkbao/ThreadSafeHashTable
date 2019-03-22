@@ -24,7 +24,7 @@ public:
     }
     void print() const
     {
-        printf("index[%d], data[%s]\n", m_index, m_data);
+        printf("{%d,%s} ", m_index, m_data);
     }
     inline int getIndex() const
     {
@@ -40,32 +40,37 @@ mj::ThreadSafeList<element> elist;
 void* threadFunc(void* arg)
 {
     int thid = *((int*)arg);
-    printf("==>thread[%d] begin\n", thid);
+    printf("thread[%d]$ begin\n", thid);
     auto pElement = elist.find_first_if([thid](const element& em){ return em.getIndex() == thid; });
     if (pElement) {
-        printf("==>thread[%d] get element: ", thid);
+        printf("thread[%d]$ get element: ", thid);
         pElement->print();
+        printf("\n");
     } else {
-        printf("==>thread[%d] can't find element\n", thid);
+        printf("thread[%d]$ can't find element\n", thid);
     }
 
-    printf("==>thread[%d] after remove element:\n", thid);
     elist.remove_if([thid](const element& em){ return em.getIndex() == thid; });
+    printf("thread[%d]$ after remove element[%d]: ", thid, thid);
     elist.for_each([](const element& em){ em.print(); });
-    printf("==>thread[%d] exit\n\n", thid);
+    printf("\nthread[%d]$ exit\n\n", thid);
     return NULL;
 }
 
 int main(int argc, const char *argv[])
 {
-    printf("test begin....\n");
-    const int THREAD_NUM = 16;
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        elist.push_front(element(i, "zmj"));
+    printf("test thread_safe_list begin....\n");
+    int THREAD_NUM = 4;
+    if (argc == 2) {
+        int num = atoi(argv[1]);
+        THREAD_NUM = num > 0 ? num : 4;
     }
-    printf("original list elements:\n");
+    for (int i = 0; i < THREAD_NUM; ++i) {
+        elist.push_front(element(i, "j"));
+    }
+    printf("all list elements before: ");
     elist.for_each([](const element& em){ em.print(); });
-    printf("\n");
+    printf("\n\n");
 
     pthread_t thid[THREAD_NUM];
     int localThid[THREAD_NUM];
@@ -76,6 +81,10 @@ int main(int argc, const char *argv[])
     for (int i = 0; i < THREAD_NUM; ++i) {
         pthread_join(thid[i], NULL);
     }
+
+    printf("all list elements after: ");
+    elist.for_each([](const element& em){ em.print(); });
+    printf("\n");
     printf("test done\n");
     return 0;
 }

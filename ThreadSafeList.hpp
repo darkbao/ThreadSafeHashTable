@@ -8,6 +8,7 @@
 #define __MJ_THREAD_SAFE_LIST_HPP__
 #include <mutex>
 #include <utility>
+#include <memory>
 
 namespace mj
 {
@@ -27,6 +28,9 @@ public:
         std::lock_guard<std::mutex> lock(m_head.mtx);
         pNewNode->pNext = m_head.pNext;
         m_head.pNext = pNewNode;
+#ifdef __DEBUG_NODE__
+        printf("**DEBUG**$ add new node[0x%p]\n", pNewNode);
+#endif
     }
 
     template<typename Function>
@@ -44,7 +48,7 @@ public:
     }
 
     template<typename Predicate>
-    const T* find_first_if(Predicate pred)
+    std::shared_ptr<T> find_first_if(Predicate pred)
     {
         node* pCurNode = &m_head;
         std::unique_lock<std::mutex> lock(m_head.mtx);
@@ -56,7 +60,7 @@ public:
             pCurNode = pNextNode;
             lock = std::move(nextLock);
         }
-        return NULL;
+        return std::shared_ptr<T>();
     }
 
     template<typename Predicate>
@@ -70,6 +74,9 @@ public:
                 pCurNode->pNext = pNextNode->pNext;
                 nextLock.unlock();
                 delete pNextNode;
+#ifdef __DEBUG_NODE__
+                 printf("**DEBUG**$ delete node[0x%p]\n", pNextNode);
+#endif
             } else {
                 lock.unlock();
                 pCurNode = pNextNode;
@@ -83,11 +90,18 @@ private:
     {
         std::mutex mtx;
         node* pNext;
-        T*    pData;
+        std::shared_ptr<T> pData;
 
-        node(): pNext(NULL), pData(NULL) { }
-        ~node() { if (pData) delete pData; }
-        node(const T& value): pNext(NULL), pData(new T(value)) { }
+        node(): pNext(NULL) { }
+#ifdef __DEBUG_NODE__
+        node(const T& value) : pNext(NULL), 
+             pData( new T(value), 
+                    [](T* p){ delete p; printf("**DEBUG**$ shared_ptr: delete ptr[0x%p]\n", p);}, 
+                    std::allocator<T>() )
+        { }
+#else
+        node(const T& value) : pNext(NULL), pData(new T(value)){ }
+#endif
     };
     node m_head;    
 };
